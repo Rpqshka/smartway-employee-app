@@ -95,7 +95,7 @@ func checkUpdatedEmployee(updatedEmployee employee.UpdateEmployee) error {
 		}
 	}
 
-	if updatedEmployee.CompanyId < 1 {
+	if updatedEmployee.CompanyId < 0 {
 		return errors.New("incorrect Company ID")
 	}
 

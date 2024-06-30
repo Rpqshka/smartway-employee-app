@@ -137,6 +137,26 @@ func (r *EmployeePostgres) GetEmployeesByCompanyId(id int, departmentName string
 }
 
 func (r *EmployeePostgres) UpdateEmployee(updatedEmployee employee.UpdateEmployee) error {
+	tx, err := r.db.Begin()
+	if err != nil {
+		return err
+	}
+
+	if updatedEmployee.Passport.Number != "" {
+		var id int
+
+		selectQuery := fmt.Sprintf(`SELECT id FROM %s WHERE passport_number = $1 FOR UPDATE`, employeesTable)
+		err = tx.QueryRow(selectQuery, updatedEmployee.Passport.Number).Scan(&id)
+		if err != nil && err != sql.ErrNoRows {
+			tx.Rollback()
+			return err
+		}
+		if id != 0 {
+			tx.Rollback()
+			return fmt.Errorf("employee with passport number %s already exists with id %d", updatedEmployee.Passport.Number, id)
+		}
+	}
+
 	setFields := map[string]interface{}{
 		"name":             updatedEmployee.Name,
 		"surname":          updatedEmployee.Surname,
@@ -173,8 +193,14 @@ func (r *EmployeePostgres) UpdateEmployee(updatedEmployee employee.UpdateEmploye
 		SET %s
 		WHERE id = $1`, employeesTable, setQuery)
 
-	_, err := r.db.Exec(query, args...)
+	_, err = tx.Exec(query, args...)
 	if err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	if err = tx.Commit(); err != nil {
+		tx.Rollback()
 		return err
 	}
 
